@@ -60,7 +60,7 @@ for i = 1:roiCount
 
     if ~isempty(centroids)
         hFig = figure; imshow(roiImages{i}); hold on;
-        plot(centroids(:,1), centroids(:,2), 'r+', 'MarkerSize', 2);
+        plot(centroids(:,1), centroids(:,2), 'r+', 'MarkerSize', 4);
         hold off;
     else
         hFig = figure; imshow(roiImages{i}); % Just show the ROI image without centroids

@@ -1,12 +1,25 @@
 clc;
-clear;
 close all;
 
-% Invoke the parameter tuning GUI and wait for the user to close it
-parameterTuningGUI;
-uiwait(gcf);  % Wait for the GUI to close
+% Prompt the user to choose whether to perform parameter setting
+choice = questdlg('Would you like to perform parameter setting?', ...
+    'Parameter Setting', ...
+    'Yes', 'No', 'Yes');
 
-% Access the global parameters set by the GUI
+% Check the user's choice
+if strcmp(choice, 'Yes')
+    % Invoke the parameter tuning GUI and wait for the user to close it
+    parameterTuningGUI;
+    uiwait(gcf);  % Wait for the GUI to close
+else
+    % Check if parameters exist in the workspace
+    if ~exist('threshold', 'var') || ~exist('minSize', 'var') || ~exist('maxSize', 'var') || ~exist('erosionSize', 'var')
+        errordlg('No parameter is detected, need to set the parameters first.', 'Parameter Error');
+        return;  % Exit the script if parameters are not set
+    end
+end
+
+% Access the global parameters set by the GUI or already existing in the workspace
 global threshold minSize maxSize erosionSize;
 
 % Directory containing your image files
