@@ -1,12 +1,14 @@
 function parameterTuningGUI()
 % Define global variables for parameters
-global threshold minSize maxSize erosionSize imgData;
+% Consider avoiding global variables if possible
+global threshold minSize maxSize erosionSize imgData Marker_size;
 
 % Initial default values for parameters
 threshold = 0.35;
 minSize = 15;
 maxSize = 2000;
 erosionSize = 1;
+Marker_size = 4;
 
 % Get screen size and set the figure size to 90% of the screen
 screenSize = get(0, 'ScreenSize');
@@ -43,95 +45,107 @@ uicontrol('Parent', hFig, 'Style', 'text', 'String', 'Max Size', 'Position', [59
 hErosionSizeSlider = uicontrol('Parent', hFig, 'Style', 'slider', 'Min', 1, 'Max', 10, 'Value', erosionSize, 'Position', [810, controlYStart, 200, 20], 'Callback', @adjustErosionSize);
 uicontrol('Parent', hFig, 'Style', 'text', 'String', 'Erosion Size', 'Position', [810, controlYStart + 25, 200, 20]);
 
+% Marker size slider - corrected callback
+hMarkerSizeSlider = uicontrol('Parent', hFig, 'Style', 'slider', 'Min', 1, 'Max', 10, 'Value', Marker_size, 'Position', [1030, controlYStart, 200, 20], 'Callback', @adjustMarkerSize);
+uicontrol('Parent', hFig, 'Style', 'text', 'String', 'Marker Size', 'Position', [1030, controlYStart + 25, 200, 20]);
+
 % "Save Parameters" button
-uicontrol('Parent', hFig, 'Style', 'pushbutton', 'String', 'Save Parameters', 'Position', [1030, controlYStart, 120, 30], 'Callback', @saveParameters);
+uicontrol('Parent', hFig, 'Style', 'pushbutton', 'String', 'Save Parameters', 'Position', [1250, controlYStart, 100, 30], 'Callback', @saveParameters);
 
 % Panel for displaying the image, using the remaining figure space
 hPanelImage = uipanel('Parent', hFig, 'Position', [0.01, 0.15, 0.98, 0.8]);
 hAxImage = axes('Parent', hPanelImage, 'Position', [0 0 1 1]);
 
-    function loadImage(~, ~)
-        [fileName, pathName] = uigetfile({'*.tif;*.jpg;*.png;*.oir', 'Image Files (*.tif, *.jpg, *.png, *.oir)'}, 'Select an Image');
-        if fileName ~= 0
-            imgPath = fullfile(pathName, fileName);
-            imgData = imread(imgPath);
-            if size(imgData, 3) > 1
-                imgData = rgb2gray(imgData); % Convert to grayscale if it's a color image
-            end
-            updateImage();
+function loadImage(~, ~)
+    [fileName, pathName] = uigetfile({'*.tif;*.jpg;*.png;*.oir', 'Image Files (*.tif, *.jpg, *.png, *.oir)'}, 'Select an Image');
+    if fileName ~= 0
+        imgPath = fullfile(pathName, fileName);
+        imgData = imread(imgPath);
+        if size(imgData, 3) > 1
+            imgData = rgb2gray(imgData); % Convert to grayscale if it's a color image
         end
-    end
-
-    function adjustThreshold(~, ~)
-        threshold = hThresholdSlider.Value;
         updateImage();
     end
+end
 
-    function adjustMinSize(~, ~)
-        minSize = hMinSizeSlider.Value;
-        updateImage();
+function adjustThreshold(~, ~)
+    threshold = hThresholdSlider.Value;
+    updateImage();
+end
+
+function adjustMinSize(~, ~)
+    minSize = hMinSizeSlider.Value;
+    updateImage();
+end
+
+function adjustMaxSize(~, ~)
+    maxSize = hMaxSizeSlider.Value;
+    updateImage();
+end
+
+function adjustErosionSize(~, ~)
+    erosionSize = round(hErosionSizeSlider.Value); % Ensure erosion size is an integer
+    updateImage();
+end
+
+function adjustMarkerSize(~, ~)
+    Marker_size = round(hMarkerSizeSlider.Value); % Ensure marker size is an integer
+    updateImage();
+end
+
+function updateImage()
+    if isempty(imgData)
+        return;
     end
+    % Process the image based on the current parameters
+    processedImage = processImage(imgData, threshold, minSize, maxSize, erosionSize, Marker_size);
+    % Display the processed image
+    imshow(processedImage, 'Parent', hAxImage);
+end
 
-    function adjustMaxSize(~, ~)
-        maxSize = hMaxSizeSlider.Value;
-        updateImage();
+function result = processImage(image, thresh, minSz, maxSz, eroSize, markSz)
+    I_BW = imbinarize(image, thresh);
+    I_BW_m = medfilt2(I_BW, [3, 3]);
+    se = strel('disk', eroSize); % Use the erosion size from the slider
+    I_BW_e = imerode(I_BW_m, se);
+    BWnobord = imclearborder(I_BW_e, 4);
+    L = bwlabeln(BWnobord, 8);
+    S = regionprops(L, 'Area', 'Centroid');
+
+    % Filter based on area size and get centroids
+    validAreas = ([S.Area] >= minSz) & ([S.Area] <= maxSz);
+    validS = S(validAreas);
+    centroids = cat(1, validS.Centroid); % Concatenate all centroids into an Nx2 matrix
+
+    % Overlay the labeled areas on the original image
+    labeledImage = labeloverlay(image, BWnobord, 'Transparency',0.7);
+
+    % Create a figure and hold it for overlaying centroids
+    result = labeledImage;
+    if ~isempty(centroids)
+        % If there are centroids, overlay them on the result image
+        f = figure('visible', 'off');
+        imshow(result, 'Parent', gca); hold on;
+        % Plot each centroid as a red "+"
+        plot(centroids(:,1), centroids(:,2), 'r+', 'MarkerSize', markSz, 'LineWidth', 1.5);
+        hold off;
+        % Capture the figure as an image
+        result = getframe(gca);
+        result = result.cdata;
+        close(f);
     end
+end
 
-    function adjustErosionSize(~, ~)
-        erosionSize = round(hErosionSizeSlider.Value); % Ensure erosion size is an integer
-        updateImage();
-    end
+function saveParameters(~, ~)
+    % Save the current parameters to global variables
+    threshold = hThresholdSlider.Value;
+    minSize = hMinSizeSlider.Value;
+    maxSize = hMaxSizeSlider.Value;
+    erosionSize = round(hErosionSizeSlider.Value);
+    Marker_size = round(hMarkerSizeSlider.Value);
+    
+    % Provide feedback that parameters are saved
+    msgbox('Parameters saved successfully.', 'Success', 'help');
+end
 
-    function updateImage()
-        if isempty(imgData)
-            return;
-        end
-        % Process the image based on the current parameters
-        processedImage = processImage(imgData, threshold, minSize, maxSize, erosionSize);
-        % Display the processed image
-        imshow(processedImage, 'Parent', hAxImage);
-    end
-
-    function result = processImage(image, thresh, minSz, maxSz, eroSize)
-        I_BW = imbinarize(image, thresh);
-        I_BW_m = medfilt2(I_BW, [3, 3]);
-        se = strel('cube', eroSize); % Use the erosion size from the slider
-        I_BW_e = imerode(I_BW_m, se);
-        BWnobord = imclearborder(I_BW_e, 4);
-        L = bwlabeln(BWnobord, 8);
-        S = regionprops(L, 'Area', 'Centroid');
-
-        % Filter based on area size and get centroids
-        validAreas = ([S.Area] >= minSz) & ([S.Area] <= maxSz);
-        validS = S(validAreas);
-        centroids = cat(1, validS.Centroid); % Concatenate all centroids into an Nx2 matrix
-
-        % Overlay the labeled areas on the original image
-        labeledImage = labeloverlay(image, BWnobord, 'Transparency',0.7);
-
-        % Create a figure and hold it for overlaying centroids
-        result = labeledImage;
-        if ~isempty(centroids)
-            % If there are centroids, overlay them on the result image
-            f = figure('visible', 'off');
-            imshow(result, 'Parent', gca); hold on;
-            % Plot each centroid as a red "+"
-            plot(centroids(:,1), centroids(:,2), 'r+', 'MarkerSize', 5, 'LineWidth', 1.5);
-            hold off;
-            % Capture the figure as an image
-            result = getframe(gca);
-            result = result.cdata;
-            close(f);
-        end
-    end
-
-    function saveParameters(~, ~)
-        % Save the current parameters to global variables
-        threshold = hThresholdSlider.Value;
-        minSize = hMinSizeSlider.Value;
-        maxSize = hMaxSizeSlider.Value;
-        erosionSize = round(hErosionSizeSlider.Value);
-        % Provide feedback that parameters are saved
-        msgbox('Parameters saved successfully.', 'Success', 'help');
-    end
 end

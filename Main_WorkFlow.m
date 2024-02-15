@@ -20,7 +20,7 @@ else
 end
 
 % Access the global parameters set by the GUI or already existing in the workspace
-global threshold minSize maxSize erosionSize;
+global threshold minSize maxSize erosionSize Marker_size ;
 
 % Directory containing your image files
 Image_Directory = pwd;
@@ -39,5 +39,5 @@ for i = 1:length(Image_Files)
     firstImage = imread(filePath);
 
     % Analyze the image with the modified function, passing in the parameters
-    analyzeROIsAndCellsFromData(firstImage, baseName, threshold, minSize, maxSize, erosionSize);
+    analyzeROIsAndCellsFromData(firstImage, baseName, threshold, minSize, maxSize, erosionSize, Marker_size);
 end

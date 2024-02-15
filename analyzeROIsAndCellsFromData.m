@@ -1,4 +1,4 @@
-function analyzeROIsAndCellsFromData(imageData, baseName, threshold, minSize, maxSize, erosionSize)
+function analyzeROIsAndCellsFromData(imageData, baseName, threshold, minSize, maxSize, erosionSize, Marker_size)
 % Convert imageData from uint16 to uint8
 imageDataUint8 = uint8(double(imageData) / double(max(imageData(:))) * 255);
 
@@ -60,7 +60,7 @@ for i = 1:roiCount
 
     if ~isempty(centroids)
         hFig = figure; imshow(roiImages{i}); hold on;
-        plot(centroids(:,1), centroids(:,2), 'r+', 'MarkerSize', 4);
+        plot(centroids(:,1), centroids(:,2), 'r+', 'MarkerSize', Marker_size);
         hold off;
     else
         hFig = figure; imshow(roiImages{i}); % Just show the ROI image without centroids
